@@ -41,7 +41,6 @@ jobs:
           AUTH_HEADER="AUTHORIZATION: basic $(printf "x-access-token:%s" "${GITHUB_TOKEN}" | base64 | tr -d '\n')"
 
           mkdir -p publish
-          cp -R dist/. publish/
           cd publish
 
           git init
@@ -55,6 +54,10 @@ jobs:
           else
             git checkout --orphan output
           fi
+
+          # Ensure branch content exactly matches generated artifacts.
+          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          cp -R ../dist/. ./
 
           git add -A
           if git diff --cached --quiet; then
