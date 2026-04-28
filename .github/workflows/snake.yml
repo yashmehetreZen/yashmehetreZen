@@ -16,22 +16,48 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
       - name: Generate snake SVGs
-        uses: platane/snk@v3
-        with:
-          github_user_name: ${{ github.repository_owner }}
-          outputs: |
-            dist/github-snake.svg
-            dist/github-snake-dark.svg?palette=github-dark
-
-      - name: Publish to output branch
-        uses: crazy-max/ghaction-github-pages@v4
-        with:
-          target_branch: output
-          build_dir: dist
+        shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          docker run --rm \
+            -e INPUT_GITHUB_USER_NAME="${{ github.repository_owner }}" \
+            -e INPUT_GITHUB_TOKEN="${GITHUB_TOKEN}" \
+            -e INPUT_OUTPUTS=$'dist/github-snake.svg\ndist/github-snake-dark.svg?palette=github-dark' \
+            -v "${{ github.workspace }}:/github/workspace" \
+            -w /github/workspace \
+            platane/snk@sha256:b107f810d467a26b1e7ac46751073d1247728421155a47e77f6cd2dc66dcc74c
+
+      - name: Publish generated files to output branch
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git fetch origin
+
+          if git ls-remote --exit-code --heads origin output >/dev/null 2>&1; then
+            git checkout -B output origin/output
+          else
+            git checkout --orphan output
+            git rm -rf . >/dev/null 2>&1 || true
+          fi
+
+          rsync -av --delete dist/ ./
+
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No snake changes to publish."
+            exit 0
+          fi
+
+          git commit -m "chore: update contribution snake"
+          git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git" output:output
 
