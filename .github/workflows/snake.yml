@@ -37,20 +37,23 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+          REPO_URL="https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
 
+          mkdir -p publish
+          cp -R dist/. publish/
+          cd publish
+
+          git init
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add origin "${REPO_URL}"
 
-          git fetch origin
-
-          if git ls-remote --exit-code --heads origin output >/dev/null 2>&1; then
-            git checkout -B output origin/output
+          if git ls-remote --exit-code --heads "${REPO_URL}" output >/dev/null 2>&1; then
+            git fetch --depth=1 origin output
+            git checkout -B output FETCH_HEAD
           else
             git checkout --orphan output
-            git rm -rf . >/dev/null 2>&1 || true
           fi
-
-          rsync -av --delete dist/ ./
 
           git add -A
           if git diff --cached --quiet; then
@@ -59,5 +62,5 @@ jobs:
           fi
 
           git commit -m "chore: update contribution snake"
-          git push "https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git" output:output
+          git push origin output:output
 
