@@ -37,7 +37,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          REPO_URL="https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git"
+          REPO_URL="https://github.com/${{ github.repository }}.git"
+          AUTH_HEADER="AUTHORIZATION: basic $(printf "x-access-token:%s" "${GITHUB_TOKEN}" | base64 | tr -d '\n')"
 
           mkdir -p publish
           cp -R dist/. publish/
@@ -48,8 +49,8 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git remote add origin "${REPO_URL}"
 
-          if git ls-remote --exit-code --heads "${REPO_URL}" output >/dev/null 2>&1; then
-            git fetch --depth=1 origin output
+          if git -c "http.https://github.com/.extraheader=${AUTH_HEADER}" ls-remote --exit-code --heads "${REPO_URL}" output >/dev/null 2>&1; then
+            git -c "http.https://github.com/.extraheader=${AUTH_HEADER}" fetch --depth=1 origin output
             git checkout -B output FETCH_HEAD
           else
             git checkout --orphan output
@@ -62,5 +63,5 @@ jobs:
           fi
 
           git commit -m "chore: update contribution snake"
-          git push origin output:output
+          git -c "http.https://github.com/.extraheader=${AUTH_HEADER}" push origin output:output
 
